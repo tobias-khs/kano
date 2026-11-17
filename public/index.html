@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1f2933" />
+    <title>Kano</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <main>
+      <ul id="list"></ul>
+      <p id="empty" hidden>Nothing here.</p>
+    </main>
+
+    <nav>
+      <button id="new" type="button" aria-label="Create new item">+</button>
+      <button type="button" data-tab="all" class="active">All</button>
+      <button type="button" data-tab="daily">Daily</button>
+      <button type="button" data-tab="oneoffs">One-offs</button>
+      <button type="button" data-tab="history">History</button>
+    </nav>
+
+    <dialog id="complete-dialog">
+      <div class="sheet">
+        <p class="title"></p>
+        <button type="button" class="primary" data-action="complete">Mark completed</button>
+        <button type="button" data-action="cancel">Cancel</button>
+      </div>
+    </dialog>
+
+    <dialog id="delete-dialog">
+      <div class="sheet">
+        <p class="title"></p>
+        <div id="postpone">
+          <label>Postpone until (empty = tomorrow)
+            <input id="postpone-date" type="date" />
+          </label>
+          <button type="button" data-action="postpone">Postpone</button>
+        </div>
+        <button type="button" class="danger" data-action="delete">Delete</button>
+        <button type="button" data-action="cancel">Cancel</button>
+      </div>
+    </dialog>
+
+    <dialog id="create-dialog">
+      <form id="create-form" class="sheet" method="dialog">
+        <p class="title">New item</p>
+        <label>Name
+          <input name="name" required autocomplete="off" />
+        </label>
+        <label>Type
+          <select name="type">
+            <option value="computer">Computer</option>
+            <option value="exercise">Exercise</option>
+            <option value="admin">Admin</option>
+            <option value="study">Study</option>
+          </select>
+        </label>
+        <label>Importance
+          <select name="importance">
+            <option value="must">Must</option>
+            <option value="optional">Optional</option>
+          </select>
+        </label>
+        <label>Repeat
+          <select name="kind">
+            <option value="none">One-off</option>
+            <option value="date">One-off on a date</option>
+            <option value="daily">Every day</option>
+            <option value="weekly">Every week</option>
+            <option value="monthly">Every month</option>
+          </select>
+        </label>
+        <label data-for="date">Date
+          <input name="date" type="date" required />
+        </label>
+        <label data-for="weekly">Day of week
+          <select name="weekday">
+            <option value="1">Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+            <option value="5">Friday</option>
+            <option value="6">Saturday</option>
+            <option value="0">Sunday</option>
+          </select>
+        </label>
+        <label data-for="monthly">Day of month
+          <input name="day" type="number" min="1" max="31" value="1" required />
+        </label>
+        <label data-for="weekly monthly">Time (optional)
+          <input name="time" type="time" />
+        </label>
+        <button type="submit" class="primary">Create</button>
+        <button type="button" id="create-cancel">Cancel</button>
+      </form>
+    </dialog>
+  </body>
+</html>

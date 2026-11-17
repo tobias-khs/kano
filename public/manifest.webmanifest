@@ -1,0 +1,13 @@
+{
+  "name": "Kano",
+  "short_name": "Kano",
+  "description": "Todo list",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#14181d",
+  "theme_color": "#1f2933",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
