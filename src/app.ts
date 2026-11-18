@@ -1,23 +1,45 @@
-import type { HistoryEntry, Item, ItemType, Periodicity, Tab } from './types.ts'
+import type { HistoryEntry, Item, ItemType, Tab } from './types.ts'
 import * as db from './db.ts'
-import { firstDue, isOneOff, nextDue, startOfDate, tabItems, tomorrow } from './schedule.ts'
+import { addDays, isOneOff, migrate, tabItems, today } from './schedule.ts'
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector(selector) as T
 
 const list = $<HTMLUListElement>('#list')
 const empty = $('#empty')
+const settings = $('#settings')
 const nav = $('nav')
 const completeDialog = $<HTMLDialogElement>('#complete-dialog')
 const deleteDialog = $<HTMLDialogElement>('#delete-dialog')
 const createDialog = $<HTMLDialogElement>('#create-dialog')
+const overwriteDialog = $<HTMLDialogElement>('#overwrite-dialog')
 const createForm = $<HTMLFormElement>('#create-form')
 const postpone = $('#postpone')
+const skipButton = $('#skip')
 const postponeDate = $<HTMLInputElement>('#postpone-date')
+const resetTimeInput = $<HTMLInputElement>('#reset-time')
+const importFile = $<HTMLInputElement>('#import-file')
+const settingsMessage = $('#settings-message')
+
+const RESET_TIME_KEY = 'kano.resetTime'
+
+interface ExportFile {
+  version: number
+  exportedAt: string
+  settings: { resetTime: string }
+  items: Item[]
+  history: HistoryEntry[]
+}
 
 let items: Item[] = []
 let history: HistoryEntry[] = []
+let resetTime = localStorage.getItem(RESET_TIME_KEY) ?? '04:00'
 let tab: Tab = 'all'
 let current: Item | undefined
+let editing: Item | undefined
+let pendingImport: ExportFile | undefined
+
+/** The current logical day, which starts at the reset time. */
+const day = () => today(Date.now(), resetTime)
 
 // ---- rendering ----
 
@@ -42,6 +64,12 @@ function row(name: string, type: ItemType, id?: string, note?: string): HTMLLIEl
 }
 
 function render(): void {
+  settings.hidden = tab !== 'settings'
+  list.hidden = tab === 'settings'
+  if (tab === 'settings') {
+    empty.hidden = true
+    return
+  }
   const rows =
     tab === 'history'
       ? [...history]
@@ -51,10 +79,11 @@ function render(): void {
               h.name,
               h.type,
               undefined,
-              new Date(h.doneAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }),
+              (h.skipped ? 'skipped · ' : '') +
+                new Date(h.doneAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }),
             ),
           )
-      : tabItems(items, tab, Date.now()).map((item) => row(item.name, item.type, item.id))
+      : tabItems(items, tab, day()).map((item) => row(item.name, item.type, item.id))
   list.replaceChildren(...rows)
   empty.hidden = rows.length > 0
 }
@@ -93,14 +122,30 @@ async function complete(item: Item): Promise<void> {
   }
   item.lastDoneAt = now
   if (isOneOff(item)) item.status = 'done'
-  else item.dueAt = nextDue(item.periodicity, now)
+  else item.dueDay = addDays(day(), item.frequency)
+  history.push(entry)
+  await db.putItem(item, entry)
+  await removeRow(item.id)
+}
+
+/** Moves a recurring item to its next occurrence without it counting as done. */
+async function skip(item: Item): Promise<void> {
+  const entry: HistoryEntry = {
+    id: crypto.randomUUID(),
+    itemId: item.id,
+    name: item.name,
+    type: item.type,
+    doneAt: Date.now(),
+    skipped: true,
+  }
+  item.dueDay = addDays(day(), item.frequency)
   history.push(entry)
   await db.putItem(item, entry)
   await removeRow(item.id)
 }
 
 async function postponeItem(item: Item, date: string): Promise<void> {
-  item.dueAt = date ? startOfDate(date) : tomorrow(Date.now())
+  item.dueDay = date || addDays(day(), 1)
   await db.putItem(item)
   await removeRow(item.id)
 }
@@ -113,35 +158,32 @@ async function remove(item: Item): Promise<void> {
 }
 
 async function create(form: FormData): Promise<void> {
-  const kind = form.get('kind') as Periodicity['kind']
-  const time = (form.get('time') as string | null) || undefined
-  let periodicity: Periodicity
-  switch (kind) {
-    case 'date':
-      periodicity = { kind, date: form.get('date') as string }
-      break
-    case 'weekly':
-      periodicity = { kind, weekday: Number(form.get('weekday')), time }
-      break
-    case 'monthly':
-      periodicity = { kind, day: Number(form.get('day')), time }
-      break
-    default:
-      periodicity = { kind }
-  }
-  const now = Date.now()
+  const frequency = Number(form.get('frequency'))
   const item: Item = {
     id: crypto.randomUUID(),
     name: (form.get('name') as string).trim(),
-    createdAt: now,
-    periodicity,
+    createdAt: Date.now(),
+    frequency,
     importance: form.get('importance') as Item['importance'],
     status: 'open',
     type: form.get('type') as ItemType,
-    dueAt: firstDue(periodicity, now),
+    dueDay: frequency ? day() : (form.get('date') as string | null) || null,
     lastDoneAt: null,
   }
   items.push(item)
+  await db.putItem(item)
+  render()
+}
+
+async function save(item: Item, form: FormData): Promise<void> {
+  const frequency = Number(form.get('frequency'))
+  // A recurring item keeps its due day; the new frequency applies from the next completion or skip.
+  if (!frequency) item.dueDay = (form.get('date') as string | null) || null
+  else if (isOneOff(item)) item.dueDay = day()
+  item.frequency = frequency
+  item.name = (form.get('name') as string).trim()
+  item.importance = form.get('importance') as Item['importance']
+  item.type = form.get('type') as ItemType
   await db.putItem(item)
   render()
 }
@@ -156,7 +198,7 @@ function openItemDialog(dialog: HTMLDialogElement, item: Item): void {
 
 // Close on a tap that both starts and ends on the backdrop. A long-press that
 // opened the dialog starts on a list row, so releasing it does not close it.
-for (const dialog of [completeDialog, deleteDialog, createDialog]) {
+for (const dialog of [completeDialog, deleteDialog, createDialog, overwriteDialog]) {
   let downOnBackdrop = false
   dialog.addEventListener('pointerdown', (e) => {
     downOnBackdrop = e.target === dialog
@@ -177,11 +219,14 @@ function onAction(dialog: HTMLDialogElement, actions: Record<string, (item: Item
 
 onAction(completeDialog, { complete })
 onAction(deleteDialog, {
+  edit: openForm,
+  tomorrow: (item) => postponeItem(item, ''),
+  skip,
   delete: remove,
   postpone: (item) => postponeItem(item, postponeDate.value),
 })
 
-// ---- list gestures: tap = complete, long-tap = delete / postpone ----
+// ---- list gestures: tap = complete, long-tap = edit / postpone / skip / delete ----
 
 let pressTimer: number | undefined
 let longPressed = false
@@ -202,6 +247,7 @@ list.addEventListener('pointerdown', (e) => {
   pressTimer = setTimeout(() => {
     longPressed = true
     postpone.hidden = !(isOneOff(item) && item.importance === 'optional')
+    skipButton.hidden = isOneOff(item) || item.importance === 'must'
     postponeDate.value = ''
     openItemDialog(deleteDialog, item)
   }, 500)
@@ -226,41 +272,154 @@ nav.addEventListener('click', (e) => {
   if (!button) return
   tab = button.dataset.tab as Tab
   for (const b of nav.querySelectorAll('[data-tab]')) b.classList.toggle('active', b === button)
+  showMessage('')
   render()
 })
 
 // ---- create form ----
 
-const kindSelect = createForm.elements.namedItem('kind') as HTMLSelectElement
-const timeInput = createForm.elements.namedItem('time') as HTMLInputElement
+const frequencySelect = createForm.elements.namedItem('frequency') as HTMLSelectElement
 
 function updateFields(): void {
   for (const label of createForm.querySelectorAll<HTMLElement>('[data-for]')) {
-    const shown = label.dataset.for!.split(' ').includes(kindSelect.value)
+    const shown = label.dataset.for === frequencySelect.value
     label.hidden = !shown
-    // Disabled controls are neither validated nor submitted.
-    label.querySelector<HTMLInputElement | HTMLSelectElement>('input, select')!.disabled = !shown
+    // Disabled controls are not submitted.
+    label.querySelector('input')!.disabled = !shown
   }
 }
 
-kindSelect.addEventListener('change', () => {
-  timeInput.value = kindSelect.value === 'weekly' ? '09:00' : ''
-  updateFields()
-})
-$('#new').addEventListener('click', () => {
+/** Opens the form for a new item, or for editing the given one. */
+function openForm(item?: Item): void {
+  editing = item
   createForm.reset()
+  if (item) {
+    const field = (name: string) => createForm.elements.namedItem(name) as HTMLInputElement
+    field('name').value = item.name
+    field('type').value = item.type
+    field('importance').value = item.importance
+    field('frequency').value = String(item.frequency)
+    field('date').value = isOneOff(item) ? (item.dueDay ?? '') : ''
+  }
+  $('#create-title').textContent = item ? 'Edit item' : 'New item'
+  $('#create-submit').textContent = item ? 'Save' : 'Create'
   updateFields()
   createDialog.showModal()
-})
+}
+
+frequencySelect.addEventListener('change', updateFields)
+$('#new').addEventListener('click', () => openForm())
 $('#create-cancel').addEventListener('click', () => createDialog.close())
-createForm.addEventListener('submit', () => create(new FormData(createForm)))
+createForm.addEventListener('submit', () => {
+  const form = new FormData(createForm)
+  if (editing) save(editing, form)
+  else create(form)
+})
+
+// ---- settings ----
+
+function showMessage(text: string): void {
+  settingsMessage.textContent = text
+  settingsMessage.hidden = !text
+}
+
+function setResetTime(value: string): void {
+  resetTime = value
+  localStorage.setItem(RESET_TIME_KEY, value)
+  resetTimeInput.value = value
+}
+
+resetTimeInput.value = resetTime
+resetTimeInput.addEventListener('change', () => {
+  // An emptied field keeps the previous time.
+  setResetTime(resetTimeInput.value || resetTime)
+})
+
+$('#export').addEventListener('click', () => {
+  const data: ExportFile = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    settings: { resetTime },
+    items,
+    history,
+  }
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
+  )
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `kano-export-${today(Date.now(), '00:00')}.json`
+  link.click()
+  URL.revokeObjectURL(url)
+})
+
+const hasId = (value: unknown) =>
+  typeof value === 'object' && value !== null && typeof (value as { id?: unknown }).id === 'string'
+
+function parseImport(text: string): ExportFile | undefined {
+  try {
+    const data = JSON.parse(text)
+    if (Array.isArray(data.items) && Array.isArray(data.history) && [...data.items, ...data.history].every(hasId)) {
+      return data
+    }
+  } catch {
+    // not JSON
+  }
+  return undefined
+}
+
+async function applyImport(data: ExportFile): Promise<void> {
+  const imported = data.items.map(migrate)
+  try {
+    await db.replaceAll(imported, data.history)
+  } catch {
+    showMessage('Import failed. Your existing data was not changed.')
+    return
+  }
+  items = imported
+  history = data.history
+  const time = data.settings?.resetTime
+  if (typeof time === 'string' && /^\d\d:\d\d$/.test(time)) setResetTime(time)
+  showMessage(`Imported ${items.length} items and ${history.length} history entries.`)
+}
+
+$('#import').addEventListener('click', () => importFile.click())
+importFile.addEventListener('change', async () => {
+  const file = importFile.files?.[0]
+  importFile.value = ''
+  if (!file) return
+  const data = parseImport(await file.text())
+  if (!data) {
+    showMessage('This file is not a Kano export. Nothing was imported.')
+    return
+  }
+  if (items.length || history.length) {
+    pendingImport = data
+    overwriteDialog.showModal()
+  } else {
+    await applyImport(data)
+  }
+})
+overwriteDialog.addEventListener('click', (e) => {
+  const action = (e.target as HTMLElement).closest<HTMLElement>('[data-action]')?.dataset.action
+  if (!action) return
+  overwriteDialog.close()
+  if (action === 'overwrite' && pendingImport) applyImport(pendingImport)
+  pendingImport = undefined
+})
 
 // ---- start ----
 
-;[items, history] = await Promise.all([db.getItems(), db.getHistory()])
+const stored = await db.getItems()
+items = stored.map(migrate)
+// Save items converted from the first version's format.
+for (const [i, item] of items.entries()) {
+  if (item !== stored[i]) await db.putItem(item)
+}
+history = await db.getHistory()
 render()
 
-// Items become visible when they fall due.
+// Items become visible when their day starts.
 setInterval(render, 60_000)
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) render()

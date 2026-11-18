@@ -45,6 +45,24 @@ export async function putItem(item: Item, entry?: HistoryEntry): Promise<void> {
   await done(tx)
 }
 
+/** Deletes everything and stores the given data instead, in one transaction. */
+export async function replaceAll(items: Item[], history: HistoryEntry[]): Promise<void> {
+  const tx = (await open()).transaction(['items', 'history'], 'readwrite')
+  try {
+    const itemStore = tx.objectStore('items')
+    const historyStore = tx.objectStore('history')
+    itemStore.clear()
+    historyStore.clear()
+    for (const item of items) itemStore.put(item)
+    for (const entry of history) historyStore.put(entry)
+  } catch (error) {
+    // Without this a failed put would still commit the two clears.
+    tx.abort()
+    throw error
+  }
+  await done(tx)
+}
+
 /** Deletes an item together with its history entries. */
 export async function deleteItem(id: string): Promise<void> {
   const tx = (await open()).transaction(['items', 'history'], 'readwrite')

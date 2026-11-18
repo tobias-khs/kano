@@ -14,6 +14,16 @@
     <main>
       <ul id="list"></ul>
       <p id="empty" hidden>Nothing here.</p>
+
+      <section id="settings" class="sheet" hidden>
+        <label>Day resets at
+          <input id="reset-time" type="time" />
+        </label>
+        <button type="button" id="export">Export all data</button>
+        <button type="button" id="import">Import all data</button>
+        <input id="import-file" type="file" accept="application/json,.json" hidden />
+        <p id="settings-message" hidden></p>
+      </section>
     </main>
 
     <nav>
@@ -22,6 +32,12 @@
       <button type="button" data-tab="daily">Daily</button>
       <button type="button" data-tab="oneoffs">One-offs</button>
       <button type="button" data-tab="history">History</button>
+      <button type="button" data-tab="settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      </button>
     </nav>
 
     <dialog id="complete-dialog">
@@ -35,25 +51,38 @@
     <dialog id="delete-dialog">
       <div class="sheet">
         <p class="title"></p>
+        <button type="button" data-action="edit">Edit</button>
+        <button type="button" data-action="tomorrow">Postpone to next day</button>
+        <button type="button" id="skip" data-action="skip">Skip</button>
         <div id="postpone">
-          <label>Postpone until (empty = tomorrow)
+          <label>Postpone until
             <input id="postpone-date" type="date" />
           </label>
-          <button type="button" data-action="postpone">Postpone</button>
+          <button type="button" data-action="postpone">Postpone to date</button>
         </div>
         <button type="button" class="danger" data-action="delete">Delete</button>
         <button type="button" data-action="cancel">Cancel</button>
       </div>
     </dialog>
 
+    <dialog id="overwrite-dialog">
+      <div class="sheet">
+        <p class="title">Overwrite existing data?</p>
+        <p class="text">All current items and history will be deleted and replaced by the imported file.</p>
+        <button type="button" class="danger" data-action="overwrite">Overwrite</button>
+        <button type="button" data-action="cancel">Cancel</button>
+      </div>
+    </dialog>
+
     <dialog id="create-dialog">
       <form id="create-form" class="sheet" method="dialog">
-        <p class="title">New item</p>
+        <p class="title" id="create-title">New item</p>
         <label>Name
           <input name="name" required autocomplete="off" />
         </label>
         <label>Type
           <select name="type">
+            <option value="other" selected>Other</option>
             <option value="computer">Computer</option>
             <option value="exercise">Exercise</option>
             <option value="admin">Admin</option>
@@ -62,40 +91,26 @@
         </label>
         <label>Importance
           <select name="importance">
+            <option value="optional" selected>Optional</option>
             <option value="must">Must</option>
-            <option value="optional">Optional</option>
           </select>
         </label>
-        <label>Repeat
-          <select name="kind">
-            <option value="none">One-off</option>
-            <option value="date">One-off on a date</option>
-            <option value="daily">Every day</option>
-            <option value="weekly">Every week</option>
-            <option value="monthly">Every month</option>
+        <label>Frequency
+          <select name="frequency">
+            <option value="1" selected>Every day</option>
+            <option value="2">Every 2nd day</option>
+            <option value="3">Every 3rd day</option>
+            <option value="4">Every 4th day</option>
+            <option value="7">Every 7th day</option>
+            <option value="14">Every 14th day</option>
+            <option value="30">Every 30th day</option>
+            <option value="0">One-off</option>
           </select>
         </label>
-        <label data-for="date">Date
-          <input name="date" type="date" required />
+        <label data-for="0">Due date (optional)
+          <input name="date" type="date" />
         </label>
-        <label data-for="weekly">Day of week
-          <select name="weekday">
-            <option value="1">Monday</option>
-            <option value="2">Tuesday</option>
-            <option value="3">Wednesday</option>
-            <option value="4">Thursday</option>
-            <option value="5">Friday</option>
-            <option value="6">Saturday</option>
-            <option value="0">Sunday</option>
-          </select>
-        </label>
-        <label data-for="monthly">Day of month
-          <input name="day" type="number" min="1" max="31" value="1" required />
-        </label>
-        <label data-for="weekly monthly">Time (optional)
-          <input name="time" type="time" />
-        </label>
-        <button type="submit" class="primary">Create</button>
+        <button type="submit" class="primary" id="create-submit">Create</button>
         <button type="button" id="create-cancel">Cancel</button>
       </form>
     </dialog>

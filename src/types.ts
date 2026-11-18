@@ -1,24 +1,23 @@
-export type Periodicity =
-  | { kind: 'none' }
-  | { kind: 'date'; date: string } // YYYY-MM-DD
-  | { kind: 'weekly'; weekday: number; time?: string } // 0 (Sunday) - 6, HH:MM
-  | { kind: 'monthly'; day: number; time?: string } // 1-31, HH:MM
-  | { kind: 'daily' }
+export type ItemType = 'computer' | 'exercise' | 'admin' | 'study' | 'other'
 
-export type ItemType = 'computer' | 'exercise' | 'admin' | 'study'
-
-export type Tab = 'all' | 'daily' | 'oneoffs' | 'history'
+export type Tab = 'all' | 'daily' | 'oneoffs' | 'history' | 'settings'
 
 export interface Item {
   id: string
   name: string
   createdAt: number
-  periodicity: Periodicity
+  frequency: number // 0 = one-off, else every N days: 1 | 2 | 3 | 4 | 7 | 14 | 30
   importance: 'must' | 'optional'
   status: 'open' | 'done'
   type: ItemType
-  dueAt: number | null // null = due now
+  dueDay: string | null // YYYY-MM-DD logical day; null = due now
   lastDoneAt: number | null
+}
+
+/** Item shape of the first version, still found in old stores and exports. */
+export type LegacyItem = Omit<Item, 'frequency' | 'dueDay'> & {
+  periodicity: { kind: 'none' | 'date' | 'daily' | 'weekly' | 'monthly' }
+  dueAt: number | null
 }
 
 export interface HistoryEntry {
@@ -27,4 +26,5 @@ export interface HistoryEntry {
   name: string
   type: ItemType
   doneAt: number
+  skipped?: boolean // moved on without being done
 }
