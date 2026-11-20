@@ -116,9 +116,10 @@ main {
 nav {
   position: fixed;
   inset: auto 0 0 0;
-  display: flex;
+  display: grid;
+  /* Equal outer columns keep the four tabs centred on the screen. */
+  grid-template-columns: 1fr repeat(5, auto) 1fr;
   align-items: center;
-  justify-content: center;
   gap: 2px;
   padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
   background: var(--surface);
@@ -136,8 +137,8 @@ nav button {
   display: flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 6px;
-  font-size: 15px;
+  padding: 0 4px;
+  font-size: 14px;
   background: none;
   border: 0;
   border-radius: 10px;
@@ -152,13 +153,17 @@ nav button.active {
 
 #new {
   justify-content: center;
+  justify-self: start;
   width: 44px;
-  margin-right: 4px;
   padding: 0;
   background: var(--accent);
   color: #fff;
   font-size: 26px;
   line-height: 1;
+}
+
+nav [data-tab='settings'] {
+  justify-self: end;
 }
 
 dialog {

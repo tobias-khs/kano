@@ -31,6 +31,7 @@
       <button type="button" data-tab="all" class="active">All</button>
       <button type="button" data-tab="daily">Daily</button>
       <button type="button" data-tab="oneoffs">One-offs</button>
+      <button type="button" data-tab="later">Later</button>
       <button type="button" data-tab="history">History</button>
       <button type="button" data-tab="settings" aria-label="Settings">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -54,12 +55,23 @@
         <button type="button" data-action="edit">Edit</button>
         <button type="button" data-action="tomorrow">Postpone to next day</button>
         <button type="button" id="skip" data-action="skip">Skip</button>
+        <button type="button" data-action="later">Move to later</button>
         <div id="postpone">
           <label>Postpone until
             <input id="postpone-date" type="date" />
           </label>
           <button type="button" data-action="postpone">Postpone to date</button>
         </div>
+        <button type="button" class="danger" data-action="delete">Delete</button>
+        <button type="button" data-action="cancel">Cancel</button>
+      </div>
+    </dialog>
+
+    <dialog id="later-dialog">
+      <div class="sheet">
+        <p class="title"></p>
+        <button type="button" class="primary" data-action="activate">Activate</button>
+        <button type="button" data-action="edit">Edit</button>
         <button type="button" class="danger" data-action="delete">Delete</button>
         <button type="button" data-action="cancel">Cancel</button>
       </div>
@@ -109,6 +121,12 @@
         </label>
         <label data-for="0">Due date (optional)
           <input name="date" type="date" />
+        </label>
+        <label>Status
+          <select name="status">
+            <option value="open" selected>Open</option>
+            <option value="later">Later</option>
+          </select>
         </label>
         <button type="submit" class="primary" id="create-submit">Create</button>
         <button type="button" id="create-cancel">Cancel</button>

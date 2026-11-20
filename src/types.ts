@@ -1,6 +1,6 @@
 export type ItemType = 'computer' | 'exercise' | 'admin' | 'study' | 'other'
 
-export type Tab = 'all' | 'daily' | 'oneoffs' | 'history' | 'settings'
+export type Tab = 'all' | 'daily' | 'oneoffs' | 'later' | 'history' | 'settings'
 
 export interface Item {
   id: string
@@ -8,7 +8,7 @@ export interface Item {
   createdAt: number
   frequency: number // 0 = one-off, else every N days: 1 | 2 | 3 | 4 | 7 | 14 | 30
   importance: 'must' | 'optional'
-  status: 'open' | 'done'
+  status: 'open' | 'done' | 'later' // later = parked, shown only in the Later tab
   type: ItemType
   dueDay: string | null // YYYY-MM-DD logical day; null = due now
   lastDoneAt: number | null

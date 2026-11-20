@@ -41,8 +41,15 @@ export function migrate(stored: Item | LegacyItem): Item {
 
 const mustFirst = (item: Item) => (item.importance === 'must' ? 0 : 1)
 
-/** Visible items of a list tab on logical day `day`, in display order. */
-export function tabItems(items: Item[], tab: 'all' | 'daily' | 'oneoffs', day: string): Item[] {
+/** Items of a list tab on logical day `day`, in display order. */
+export function tabItems(
+  items: Item[],
+  tab: 'all' | 'daily' | 'oneoffs' | 'later',
+  day: string,
+): Item[] {
+  if (tab === 'later') {
+    return items.filter((item) => item.status === 'later').sort((a, b) => a.createdAt - b.createdAt)
+  }
   const visible = items.filter((item) => isVisible(item, day))
   switch (tab) {
     case 'all':

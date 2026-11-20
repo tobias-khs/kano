@@ -10,6 +10,7 @@ const settings = $('#settings')
 const nav = $('nav')
 const completeDialog = $<HTMLDialogElement>('#complete-dialog')
 const deleteDialog = $<HTMLDialogElement>('#delete-dialog')
+const laterDialog = $<HTMLDialogElement>('#later-dialog')
 const createDialog = $<HTMLDialogElement>('#create-dialog')
 const overwriteDialog = $<HTMLDialogElement>('#overwrite-dialog')
 const createForm = $<HTMLFormElement>('#create-form')
@@ -150,6 +151,21 @@ async function postponeItem(item: Item, date: string): Promise<void> {
   await removeRow(item.id)
 }
 
+/** Parks an item: it leaves the todo lists and shows only in the Later tab. */
+async function moveToLater(item: Item): Promise<void> {
+  item.status = 'later'
+  await db.putItem(item)
+  await removeRow(item.id)
+}
+
+/** Brings a Later item back. A recurring item is due today; a one-off keeps its due date. */
+async function activate(item: Item): Promise<void> {
+  item.status = 'open'
+  if (!isOneOff(item)) item.dueDay = day()
+  await db.putItem(item)
+  await removeRow(item.id)
+}
+
 async function remove(item: Item): Promise<void> {
   items = items.filter((i) => i.id !== item.id)
   history = history.filter((h) => h.itemId !== item.id)
@@ -165,7 +181,7 @@ async function create(form: FormData): Promise<void> {
     createdAt: Date.now(),
     frequency,
     importance: form.get('importance') as Item['importance'],
-    status: 'open',
+    status: form.get('status') as 'open' | 'later',
     type: form.get('type') as ItemType,
     dueDay: frequency ? day() : (form.get('date') as string | null) || null,
     lastDoneAt: null,
@@ -177,10 +193,14 @@ async function create(form: FormData): Promise<void> {
 
 async function save(item: Item, form: FormData): Promise<void> {
   const frequency = Number(form.get('frequency'))
-  // A recurring item keeps its due day; the new frequency applies from the next completion or skip.
+  const status = form.get('status') as 'open' | 'later'
+  const activated = item.status === 'later' && status === 'open'
+  // A recurring item keeps its due day, unless it was a one-off or is brought back from Later;
+  // a new frequency applies from the next completion or skip.
   if (!frequency) item.dueDay = (form.get('date') as string | null) || null
-  else if (isOneOff(item)) item.dueDay = day()
+  else if (isOneOff(item) || activated) item.dueDay = day()
   item.frequency = frequency
+  item.status = status
   item.name = (form.get('name') as string).trim()
   item.importance = form.get('importance') as Item['importance']
   item.type = form.get('type') as ItemType
@@ -198,7 +218,7 @@ function openItemDialog(dialog: HTMLDialogElement, item: Item): void {
 
 // Close on a tap that both starts and ends on the backdrop. A long-press that
 // opened the dialog starts on a list row, so releasing it does not close it.
-for (const dialog of [completeDialog, deleteDialog, createDialog, overwriteDialog]) {
+for (const dialog of [completeDialog, deleteDialog, laterDialog, createDialog, overwriteDialog]) {
   let downOnBackdrop = false
   dialog.addEventListener('pointerdown', (e) => {
     downOnBackdrop = e.target === dialog
@@ -222,11 +242,14 @@ onAction(deleteDialog, {
   edit: openForm,
   tomorrow: (item) => postponeItem(item, ''),
   skip,
+  later: moveToLater,
   delete: remove,
   postpone: (item) => postponeItem(item, postponeDate.value),
 })
+onAction(laterDialog, { activate, edit: openForm, delete: remove })
 
-// ---- list gestures: tap = complete, long-tap = edit / postpone / skip / delete ----
+// ---- list gestures: tap = complete, long-tap = edit / postpone / skip / later / delete ----
+// In the Later tab both gestures open the Later dialog.
 
 let pressTimer: number | undefined
 let longPressed = false
@@ -246,6 +269,10 @@ list.addEventListener('pointerdown', (e) => {
   pressY = e.clientY
   pressTimer = setTimeout(() => {
     longPressed = true
+    if (tab === 'later') {
+      openItemDialog(laterDialog, item)
+      return
+    }
     postpone.hidden = !(isOneOff(item) && item.importance === 'optional')
     skipButton.hidden = isOneOff(item) || item.importance === 'must'
     postponeDate.value = ''
@@ -262,7 +289,7 @@ list.addEventListener('contextmenu', (e) => e.preventDefault())
 list.addEventListener('click', (e) => {
   if (longPressed) return
   const item = itemOf(e.target)
-  if (item) openItemDialog(completeDialog, item)
+  if (item) openItemDialog(tab === 'later' ? laterDialog : completeDialog, item)
 })
 
 // ---- bottom bar ----
@@ -299,6 +326,7 @@ function openForm(item?: Item): void {
     field('type').value = item.type
     field('importance').value = item.importance
     field('frequency').value = String(item.frequency)
+    field('status').value = item.status
     field('date').value = isOneOff(item) ? (item.dueDay ?? '') : ''
   }
   $('#create-title').textContent = item ? 'Edit item' : 'New item'
