@@ -1,6 +1,6 @@
 export type ItemType = 'computer' | 'exercise' | 'admin' | 'study' | 'other'
 
-export type Tab = 'all' | 'daily' | 'oneoffs' | 'later' | 'history' | 'settings'
+export type Tab = 'all' | 'recurring' | 'oneoffs' | 'later' | 'history' | 'settings'
 
 export interface Item {
   id: string

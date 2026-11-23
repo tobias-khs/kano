@@ -97,7 +97,7 @@ test('tab order', () => {
     item('later-oneoff', 0, { status: 'later', importance: 'must' }),
     item('later-future', 7, { status: 'later', dueDay: '2026-12-24' }),
   ]
-  const names = (tab: 'all' | 'daily' | 'oneoffs' | 'later') => tabItems(items, tab, day).map((i) => i.name)
+  const names = (tab: 'all' | 'recurring' | 'oneoffs' | 'later') => tabItems(items, tab, day).map((i) => i.name)
 
   assert.deepEqual(names('all'), [
     'oneoff-must',
@@ -108,7 +108,13 @@ test('tab order', () => {
     'daily-done-long-ago',
     'daily-never-done',
   ])
-  assert.deepEqual(names('daily'), ['daily-never-done', 'daily-done-long-ago', 'daily-done-recently'])
+  assert.deepEqual(names('recurring'), [
+    'every-7-optional',
+    'every-3-must',
+    'daily-never-done',
+    'daily-done-long-ago',
+    'daily-done-recently',
+  ])
   assert.deepEqual(names('oneoffs'), ['oneoff-must', 'oneoff-optional'])
   assert.deepEqual(names('later'), ['later-daily', 'later-oneoff', 'later-future'])
 })

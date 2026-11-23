@@ -44,7 +44,7 @@ const mustFirst = (item: Item) => (item.importance === 'must' ? 0 : 1)
 /** Items of a list tab on logical day `day`, in display order. */
 export function tabItems(
   items: Item[],
-  tab: 'all' | 'daily' | 'oneoffs' | 'later',
+  tab: 'all' | 'recurring' | 'oneoffs' | 'later',
   day: string,
 ): Item[] {
   if (tab === 'later') {
@@ -61,9 +61,9 @@ export function tabItems(
             ? a.createdAt - b.createdAt
             : (a.dueDay ?? '').localeCompare(b.dueDay ?? '')),
       )
-    case 'daily':
+    case 'recurring':
       return visible
-        .filter((item) => item.frequency === 1)
+        .filter((item) => !isOneOff(item))
         .sort((a, b) => (a.lastDoneAt ?? 0) - (b.lastDoneAt ?? 0) || a.createdAt - b.createdAt)
     case 'oneoffs':
       return visible
