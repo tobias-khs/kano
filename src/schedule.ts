@@ -52,15 +52,22 @@ export function tabItems(
   }
   const visible = items.filter((item) => isVisible(item, day))
   switch (tab) {
-    case 'all':
-      return visible.sort(
-        (a, b) =>
-          Number(!isOneOff(a)) - Number(!isOneOff(b)) ||
-          mustFirst(a) - mustFirst(b) ||
-          (isOneOff(a)
-            ? a.createdAt - b.createdAt
-            : (a.dueDay ?? '').localeCompare(b.dueDay ?? '')),
-      )
+    case 'all': {
+      // Every open item, due or not: one-offs, then recurring; within each, due before not due.
+      const notDue = (item: Item) => Number(!isVisible(item, day))
+      const byDueDay = (a: Item, b: Item) => (a.dueDay ?? '').localeCompare(b.dueDay ?? '')
+      return items
+        .filter((item) => item.status === 'open')
+        .sort(
+          (a, b) =>
+            Number(!isOneOff(a)) - Number(!isOneOff(b)) ||
+            notDue(a) - notDue(b) ||
+            (notDue(a)
+              ? byDueDay(a, b) || mustFirst(a) - mustFirst(b)
+              : mustFirst(a) - mustFirst(b) ||
+                (isOneOff(a) ? a.createdAt - b.createdAt : byDueDay(a, b))),
+        )
+    }
     case 'recurring':
       return visible
         .filter((item) => !isOneOff(item))

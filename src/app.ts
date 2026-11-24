@@ -1,6 +1,6 @@
 import type { HistoryEntry, Item, ItemType, Tab } from './types.ts'
 import * as db from './db.ts'
-import { addDays, isOneOff, migrate, tabItems, today } from './schedule.ts'
+import { addDays, isOneOff, isVisible, migrate, tabItems, today } from './schedule.ts'
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector(selector) as T
 
@@ -44,9 +44,10 @@ const day = () => today(Date.now(), resetTime)
 
 // ---- rendering ----
 
-function row(name: string, type: ItemType, id?: string, note?: string): HTMLLIElement {
+function row(name: string, type: ItemType, id?: string, note?: string, notDue = false): HTMLLIElement {
   const li = document.createElement('li')
   if (id) li.dataset.id = id
+  li.classList.toggle('not-due', notDue)
   const nameEl = document.createElement('span')
   nameEl.className = 'name'
   nameEl.textContent = name
@@ -84,7 +85,10 @@ function render(): void {
                 new Date(h.doneAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }),
             ),
           )
-      : tabItems(items, tab, day()).map((item) => row(item.name, item.type, item.id))
+      : tabItems(items, tab, day()).map((item) =>
+          // Only the All tab lists open items that are not due yet; they are dimmed.
+          row(item.name, item.type, item.id, undefined, item.status === 'open' && !isVisible(item, day())),
+        )
   list.replaceChildren(...rows)
   empty.hidden = rows.length > 0
 }
@@ -97,7 +101,7 @@ async function removeRow(id: string): Promise<void> {
       [
         {
           height: `${li.offsetHeight}px`,
-          opacity: 1,
+          opacity: style.opacity,
           paddingTop: style.paddingTop,
           paddingBottom: style.paddingBottom,
           marginBottom: style.marginBottom,

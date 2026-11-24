@@ -102,11 +102,13 @@ test('tab order', () => {
   assert.deepEqual(names('all'), [
     'oneoff-must',
     'oneoff-optional',
+    'hidden-future',
     'every-3-must',
     'daily-done-recently',
     'every-7-optional',
     'daily-done-long-ago',
     'daily-never-done',
+    'hidden-not-due',
   ])
   assert.deepEqual(names('recurring'), [
     'every-7-optional',

@@ -79,6 +79,10 @@ main {
   cursor: pointer;
 }
 
+#list li.not-due {
+  opacity: 0.5;
+}
+
 .name {
   flex: 1;
   min-width: 0;
