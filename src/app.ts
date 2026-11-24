@@ -457,4 +457,22 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) render()
 })
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js')
+if ('serviceWorker' in navigator) {
+  // When an updated service worker takes over, reload once so the new version
+  // shows without a second manual refresh. Not on first install, and not while
+  // a dialog is open (the next start then shows the new version).
+  const hadController = Boolean(navigator.serviceWorker.controller)
+  let reloading = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading || document.querySelector('dialog[open]')) return
+    reloading = true
+    location.reload()
+  })
+
+  const registration = await navigator.serviceWorker.register('sw.js')
+  // An installed app is rarely reloaded, so also look for a new version
+  // whenever it comes back to the foreground.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) registration.update().catch(() => {})
+  })
+}
