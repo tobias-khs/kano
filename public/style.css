@@ -123,9 +123,9 @@ nav {
   display: grid;
   /* Equal outer columns keep the tabs centred on the screen. */
   grid-template-columns: 1fr repeat(5, auto) 1fr;
-  align-items: center;
+  align-items: start;
   gap: 2px;
-  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  padding: 0 8px calc(8px + env(safe-area-inset-bottom));
   background: var(--surface);
   border-top: 1px solid var(--border);
 }
@@ -150,7 +150,23 @@ nav button {
   cursor: pointer;
 }
 
-nav button.active {
+/* A tab hangs from the top edge of the bar; the active one takes the page
+   background and covers the bar's top border, so it joins the list above. */
+nav [data-tab] {
+  box-sizing: border-box;
+  justify-content: center;
+  min-width: 44px;
+  height: 53px;
+  margin-top: -1px;
+  padding: 8px 10px 0;
+  border: 1px solid transparent;
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+}
+
+nav [data-tab].active {
+  background: var(--bg);
+  border-color: var(--border);
   color: var(--accent);
   font-weight: 600;
 }
@@ -159,6 +175,7 @@ nav button.active {
   justify-content: center;
   justify-self: start;
   width: 44px;
+  margin-top: 8px;
   padding: 0;
   background: var(--accent);
   color: #fff;
